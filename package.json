@@ -1,0 +1,40 @@
+{
+  "name": "koishi-plugin-open-llm-vtuber",
+  "description": "用于接入open-llm-vtuber的插件",
+  "version": "1.0.0",
+  "contributors": [
+    "sanliy <isanliy@outlook.com>"
+  ],
+  "homepage": "https://github.com/adk23333/koishi-plugin-open-llm-vtuber",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adk23333/koishi-plugin-open-llm-vtuber.git"
+  },
+  "keywords": [
+    "chatbot",
+    "vtuber",
+    "llm",
+    "gpt"
+  ],
+  "peerDependencies": {
+    "koishi": "^4.18.7"
+  },
+  "koishi": {
+    "description": {
+      "en": "A plugin for open-llm-vtuber",
+      "zh": "用于接入open-llm-vtuber的插件"
+    },
+    "service": {
+      "required": [
+        "http"
+      ]
+    }
+  }
+}
