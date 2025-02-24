@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-open-llm-vtuber",
   "description": "用于接入open-llm-vtuber的插件",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "contributors": [
     "sanliy <isanliy@outlook.com>"
   ],
