@@ -3,22 +3,34 @@ import { Context, Schema, Session, sleep, User } from "koishi";
 export const name = "open-llm-vtuber";
 
 export interface Config {
-  ws_url: string;
-  show_reasoning: boolean;
-  remove_emoji: boolean;
+  ws_url?: string;
+  show_reasoning?: boolean;
+  remove_emoji?: boolean;
+  reasoning_model?: boolean;
 }
 
-export const Config: Schema<Config> = Schema.object({
-  ws_url: Schema.string()
-    .description("ws连接地址")
-    .default("ws://127.0.0.1:8080/ws"),
-  show_reasoning: Schema.boolean()
-    .description("对于Reasoning模型是否显示思考过程")
-    .default(true),
-  remove_emoji: Schema.boolean()
-    .description("对于Emoji表情是否移除")
-    .default(true),
-});
+export const Config: Schema<Config> = Schema.intersect([
+  Schema.object({
+    ws_url: Schema.string()
+      .description("ws连接地址，注意端点为/ws-clint")
+      .default("ws://127.0.0.1:8080/ws-client"),
+    reasoning_model: Schema.boolean()
+      .description("是否Reasoning模型")
+      .default(false),
+  }).description("基础设置"),
+  Schema.union([
+    Schema.object({
+      reasoning_model: Schema.const(true).required(),
+      show_reasoning: Schema.boolean()
+        .description("对于Reasoning模型是否显示思考过程")
+        .default(true),
+      remove_emoji: Schema.boolean()
+        .description("对于Emoji表情是否移除")
+        .default(true),
+    }).description("Reasoning模型相关设置"),
+    Schema.object({}),
+  ]),
+]);
 
 export const inject = {
   required: ["http"],
@@ -78,8 +90,6 @@ interface ParseEvent {
 }
 
 export function apply(ctx: Context, config: Config) {
-  const reasoning_regex = /\(([^)]+)\)/g;
-  const emoji_regex = /\[([a-zA-Z0-9]+)\]/g;
   let session_map: Map<
     string,
     [Session<never, never, Context>, WebSocket, string]
@@ -192,28 +202,22 @@ export function apply(ctx: Context, config: Config) {
               }
               case "conversation-chain-end": {
                 ctx.logger.debug("full_text: %s", full_text);
-                let reasoning_text = "";
-                let send_text = "";
-                const matchs = full_text.match(reasoning_regex);
-                if (matchs) {
-                  reasoning_text = matchs[0];
-                  send_text = full_text.replace(reasoning_text, "");
-                } else {
-                  const temp_text = full_text.split("\n\n");
-                  if (temp_text.length === 2) {
-                    reasoning_text = temp_text[0];
-                    send_text = temp_text[1];
+                if (config.reasoning_model) {
+                  let [reasoning_text, send_text] =
+                    split_reasoning_text(full_text);
+
+                  if (config.show_reasoning && reasoning_text.length > 0) {
+                    session.sendQueued(reasoning_text);
                   }
+
+                  if (config.remove_emoji) {
+                    send_text = send_text.replace(emoji_regex, "");
+                  }
+                  session.sendQueued(send_text);
+                } else {
+                  session.send(full_text);
                 }
 
-                if (config.show_reasoning && reasoning_text.length > 0) {
-                  session.sendQueued(reasoning_text);
-                }
-
-                if (config.remove_emoji) {
-                  send_text = send_text.replace(emoji_regex, "");
-                }
-                session.sendQueued(send_text);
                 full_text = "";
                 break;
               }
@@ -271,4 +275,24 @@ function get_event_and_key(session: Session): [ParseEvent, string] {
   const event: ParseEvent = JSON.parse(JSON.stringify(session.event));
   const map_key = `${event.platform};${event.channel.id};${event.channel.type}`;
   return [event, map_key];
+}
+
+const reasoning_regex = /\(([^)]+)\)/g;
+const emoji_regex = /\[([a-zA-Z0-9]+)\]/g;
+
+function split_reasoning_text(text: string): [string, string] {
+  let reasoning_text = "";
+  let send_text = "";
+  const matchs = text.match(reasoning_regex);
+  if (matchs) {
+    reasoning_text = matchs[0];
+    send_text = text.replace(reasoning_text, "");
+  } else {
+    const temp_text = text.split("\n\n");
+    if (temp_text.length === 2) {
+      reasoning_text = temp_text[0];
+      send_text = temp_text[1];
+    }
+  }
+  return [reasoning_text, send_text];
 }
